@@ -24,50 +24,100 @@ class BlogController extends AbstractController
     }
 
     /**
-     * @Route("/list", name="blog_list", defaults={"page": 6}, methods={"GET"}, requirements={"page": "\d+"})
+     * @Route("/index", name="blog_index", defaults={"page": 6}, methods={"GET"}, requirements={"page": "\d+"})
      */
-    public function list($page = 1, Request $request): JsonResponse
+    public function index($page = 1, Request $request): JsonResponse
     {
         $repository = $this->em->getRepository(BlogPost::class);
         $items = $repository->findAll();
-        dd($items); 
 
         return new JsonResponse([
             'page' => $page,
-            'data' => $items
+            'data' => array_map(function ($item) {
+                return [
+                    'id' => $item->getId(),
+                    'title' => $item->getTitle(),
+                    'published' => $item->getPublished(),
+                    'content' => $item->getContent(),
+                    'author' => $item->getAuthor(),
+                    'slug' => $item->getSlug()
+                ];
+            }, $items)
         ]);
     }
-    // /**
-    //  * @Route("/{id}", name="blog_by_id", methods={"GET"}, requirements={"id": "\d+"})
-    //  */
-    // public function post($id): JsonResponse
-    // {
-    //     dd(50);
-    //     return new JsonResponse(
-    //         self::POSTS[array_search($id, array_column(self::POSTS, 'id'))]
-    //     );
-    // }
-    // /**
-    //  * @Route("/{slug}", name="blog_by_slug", methods={"GET"})
-    //  */
-    // public function postBySlug($slug): JsonResponse
-    // {
-    //     return new JsonResponse(
-    //         self::POSTS[array_search($slug, array_column(self::POSTS, 'slug'))]
-    //     );
-    // }
+    /**
+     * @Route("/show/{id}", name="blog_show_id", methods={"GET"})
+     */
+    public function show($id): JsonResponse
+    {
+        $repository = $this->em->getRepository(BlogPost::class);
+        $item = $repository->find($id);
+        if (!$item) {
+            return new JsonResponse(['error' => 'Not found'], 404);
+        }
+
+        $responseData = [
+            'id' => $item->getId(),
+            'title' => $item->getTitle(),
+            'published' => $item->getPublished(),
+            'content' => $item->getContent(),
+            'author' => $item->getAuthor(),
+            'slug' => $item->getSlug(),
+        ];
+
+        return new JsonResponse([
+            'data' => $responseData
+        ]);
+    }
+
+    /**
+     * @Route("/show-by-slug/{slug}", name="blog_show_by_slug", methods={"GET"})
+     */
+    public function showBySlug($slug): JsonResponse
+    {
+        $repository = $this->em->getRepository(BlogPost::class);
+        $item = $repository->findOneBy(['slug' => $slug]);
+        if (!$item) {
+            return new JsonResponse(['error' => 'Not found'], 404);
+        }
+
+        $responseData = [
+            'id' => $item->getId(),
+            'title' => $item->getTitle(),
+            'published' => $item->getPublished(),
+            'content' => $item->getContent(),
+            'author' => $item->getAuthor(),
+            'slug' => $item->getSlug(),
+        ];
+
+        return new JsonResponse([
+            'data' => $responseData
+        ]);
+    }   
     
     /**
-     * @Route("/add", name="blog_add", methods={"POST"})
+     * @Route("/store", name="blog_store", methods={"POST"})
      */
-    public function add(Request $request, SerializerInterface $serializer)
+    public function store(Request $request, SerializerInterface $serializer)
     {
-        $blogPost = $serializer->deserialize($request->getContent(), BlogPost::class, 'json');
+        $data = $serializer->deserialize($request->getContent(), BlogPost::class, 'json');
+        $this->em->persist($data);  
+        $this->em->flush();   // Radi insert query
+        return $this->json($data);
+    }
 
-        $em = $this->getDoctrine()->getManager();
-        $em->persist($blogPost);  
-        $em->flush();   // Radi insert query
+    /**
+     * @Route("/delete/{id}", name="blog_delete", methods={"DELETE"})
+     */
+    public function delete($id): JsonResponse
+    {
+        $repository = $this->em->getRepository(BlogPost::class);
+        $item = $repository->find($id);
+        $this->em->remove($item);
+        $this->em->flush();
 
-        return $this->json($blogPost);
+        return new JsonResponse([
+            'message' => 'Deleted',
+        ], 200);
     }
 }
